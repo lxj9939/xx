@@ -175,7 +175,7 @@ for (let i = 0; i < rawData.length - 1; i++) {
 
 const layout = {
     title: {
-        text: "A股板块真实估值分位图（2026-01至06）<br><sup>红=高估>80%｜绿=低估<20%｜点击日期统计</sup>",
+        text: "A股板块真实估值分位图（2026-01至06）<br><sup>红=高估>80%｜绿=低估<20%</sup>",
         font: {size:18}
     },
     xaxis: {title:"日期", type:"date", tickangle:-45},
@@ -183,24 +183,11 @@ const layout = {
     hovermode:"x unified",
     shapes: shapes,
     legend: {orientation:"h", yanchor:"bottom", y:1.02, xanchor:"right", x:1},
-    dragmode: false  // 禁用框选、拖拽放大/缩小
+    dragmode: false
 };
 
 Plotly.newPlot("chart", traces, layout);
-
-// 点击统计
-document.getElementById("chart").on("plotly_click", function(data) {
-    const clickDate = data.points[0].x;
-    const row = rawData.find(d => d.date === clickDate);
-    if (!row) return;
-
-    const vals = plateNames.map(p => row[p]);
-    const over = vals.filter(v => v > OVER_THRESHOLD).length;
-    const low  = vals.filter(v => v < LOW_THRESHOLD).length;
-    const total = plateNames.length;
-
-    alert(`日期：${clickDate}\n总板块：${total}\n高估(>80%)：${over} 只\n低估(<20%)：${low} 只`);
-});
+// 已彻底删除点击弹窗相关代码
 </script>
 </body>
 </html>
