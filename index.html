@@ -182,7 +182,8 @@ const layout = {
     yaxis: {title:"估值分位（%）", range:[0,100]},
     hovermode:"x unified",
     shapes: shapes,
-    legend: {orientation:"h", yanchor:"bottom", y:1.02, xanchor:"right", x:1}
+    legend: {orientation:"h", yanchor:"bottom", y:1.02, xanchor:"right", x:1},
+    dragmode: false  // 禁用框选、拖拽放大/缩小
 };
 
 Plotly.newPlot("chart", traces, layout);
