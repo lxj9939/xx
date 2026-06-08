@@ -2,119 +2,221 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>指数红绿灯 - 复刻支付宝估值</title>
-    <!-- 引入 ECharts CDN -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>指数红绿灯 - 复刻支付宝</title>
+    <!-- ECharts CDN -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft Yahei;}
-        body{background:#f5f6f7;padding:15px;}
-        h2{text-align:center;margin-bottom:20px;color:#333;}
-        #chart{width:100%;height:420px;background:#fff;border-radius:8px;padding:10px;}
-        .table-box{margin-top:20px;background:#fff;border-radius:8px;padding:10px;overflow-x:auto;}
-        table{width:100%;border-collapse:collapse;text-align:center;}
-        th,td{padding:12px;border:1px solid #eee;}
-        th{background:#f0f2f5;}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "PingFang SC", "Microsoft Yahei", sans-serif;
+        }
+        body {
+            background-color: #f5f6f8;
+            padding: 12px;
+        }
+        .header {
+            text-align: center;
+            padding: 15px 0;
+            margin-bottom: 12px;
+        }
+        .header h1 {
+            font-size: 20px;
+            color: #222;
+            font-weight: 600;
+        }
+        .header p {
+            font-size: 13px;
+            color: #999;
+            margin-top: 4px;
+        }
+        /* 图表容器 */
+        #valuationChart {
+            width: 100%;
+            height: 380px;
+            background: #fff;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+        }
+        /* 指数列表卡片 */
+        .list-wrap {
+            background: #fff;
+            border-radius: 10px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .list-title {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .index-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f2f2f2;
+        }
+        .index-item:last-child {
+            border-bottom: none;
+        }
+        .index-name {
+            flex: 1;
+            font-size: 15px;
+            color: #222;
+        }
+        .index-data {
+            flex: 1.2;
+            text-align: center;
+            font-size: 14px;
+            color: #555;
+        }
+        .status-tag {
+            flex: 0.8;
+            text-align: right;
+            font-size: 14px;
+            font-weight: bold;
+        }
         /* 红绿灯样式 */
-        .low{color:#00b42a;font-weight:bold;}
-        .mid{color:#ff7d00;font-weight:bold;}
-        .high{color:#f53f3f;font-weight:bold;}
+        .tag-low { color: #00b42a; }
+        .tag-mid { color: #ff7d00; }
+        .tag-high { color: #f53f3f; }
+        .tip {
+            font-size: 12px;
+            color: #999;
+            margin-top: 3px;
+        }
     </style>
 </head>
 <body>
-    <h2>指数估值红绿灯（复刻支付宝）</h2>
-    <div id="chart"></div>
+    <div class="header">
+        <h1>指数红绿灯</h1>
+        <p>基于PE/PB估值分位 · 参考近5年历史估值</p>
+    </div>
 
-    <div class="table-box">
-        <table>
-            <thead>
-                <tr>
-                    <th>指数名称</th>
-                    <th>当前PE</th>
-                    <th>估值分位(近5年)</th>
-                    <th>状态</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-        </table>
+    <!-- 估值折线图（带分区背景） -->
+    <div id="valuationChart"></div>
+
+    <!-- 指数列表 + 红绿灯 -->
+    <div class="list-wrap">
+        <div class="list-title">主流指数估值一览</div>
+        <div id="indexList"></div>
     </div>
 
 <script>
-// 1. 模拟指数估值数据（可替换为真实接口）
-const indexData = [
-    {name: "沪深300", pe: 11.25, percent: 22},
-    {name: "中证500", pe: 18.62, percent: 28},
-    {name: "创业板指", pe: 35.10, percent: 76},
-    {name: "中证消费", pe: 32.45, percent: 65},
-    {name: "中证医药", pe: 24.80, percent: 41},
-    {name: "中证新能源", pe: 42.33, percent: 82}
+// 1. 模拟真实指数数据（区分PE/PB，对标支付宝主流指数）
+const indexList = [
+    { name: "沪深300", type: "PE", value: 11.25, percent: 22, tip: "低估，适合定投" },
+    { name: "中证500", type: "PE", value: 18.62, percent: 28, tip: "低估，可分批布局" },
+    { name: "创业板指", type: "PE", value: 35.10, percent: 76, tip: "高估，谨慎入场" },
+    { name: "中证消费", type: "PE", value: 32.45, percent: 65, tip: "中性，持有观望" },
+    { name: "中证医药", type: "PE", value: 24.80, percent: 41, tip: "中性，逢低加仓" },
+    { name: "中证新能源", type: "PE", value: 42.33, percent: 82, tip: "高估，不追高" },
+    { name: "中证银行", type: "PB", value: 0.78, percent: 19, tip: "低估，防御配置" }
 ];
 
-// 2. 生成表格 + 红绿灯标签
-const tableBody = document.getElementById('tableBody');
-indexData.forEach(item => {
-    let status, cls;
-    if(item.percent < 30){
-        status = "低估 🟢"; cls = "low";
-    }else if(item.percent < 70){
-        status = "中性 🟡"; cls = "mid";
-    }else{
-        status = "高估 🔴"; cls = "high";
+// 2. 渲染指数列表 + 红绿灯标签
+const listDom = document.getElementById('indexList');
+indexList.forEach(item => {
+    let statusText, className;
+    if (item.percent < 30) {
+        statusText = "低估 🟢";
+        className = "tag-low";
+    } else if (item.percent < 70) {
+        statusText = "中性 🟡";
+        className = "tag-mid";
+    } else {
+        statusText = "高估 🔴";
+        className = "tag-high";
     }
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td>${item.name}</td>
-        <td>${item.pe}</td>
-        <td class="${cls}">${item.percent}%</td>
-        <td class="${cls}">${status}</td>
+
+    const itemHtml = `
+        <div class="index-item">
+            <div class="index-name">${item.name}</div>
+            <div class="index-data">${item.type}：${item.value} | 分位：${item.percent}%</div>
+            <div class="status-tag ${className}">${statusText}</div>
+            <div class="tip">${item.tip}</div>
+        </div>
     `;
-    tableBody.appendChild(tr);
+    listDom.innerHTML += itemHtml;
 });
 
-// 3. ECharts 绘制估值折线图（复刻支付宝走势）
-const myChart = echarts.init(document.getElementById('chart'));
-const xData = indexData.map(d => d.name);
-const yData = indexData.map(d => d.percent);
+// 3. 初始化ECharts图表（复刻支付宝分区折线图）
+const chartDom = document.getElementById('valuationChart');
+const myChart = echarts.init(chartDom);
+
+// 图表数据
+const xAxisData = indexList.map(item => item.name);
+const seriesData = indexList.map(item => item.percent);
 
 const option = {
-    tooltip: {trigger: 'axis'},
-    grid: {left: '3%', right: '4%', bottom: '3%', containLabel: true},
+    tooltip: {
+        trigger: 'axis',
+        formatter: '{b}<br/>估值分位：{c}%'
+    },
+    grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '8%',
+        containLabel: true
+    },
     xAxis: {
         type: 'category',
-        data: xData,
-        axisLabel: {rotate: 15}
+        data: xAxisData,
+        axisLabel: { rotate: 15 },
+        axisLine: { lineStyle: { color: '#eee' } }
     },
     yAxis: {
         type: 'value',
         name: '估值分位(%)',
         max: 100,
-        splitLine: {lineStyle: {type: 'dashed'}}
+        min: 0,
+        splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
+        axisLine: { lineStyle: { color: '#eee' } }
+    },
+    // 分区背景色（支付宝三段底色）
+    graphic: [
+        // 0-30% 浅绿 低估区
+        { type: 'rect', left: '3%', right: '4%', top: '8%', bottom: '28%', style: { fill: 'rgba(0, 180, 42, 0.08)' } },
+        // 30%-70% 浅灰 中性区
+        { type: 'rect', left: '3%', right: '4%', top: '28%', bottom: '60%', style: { fill: 'rgba(255, 125, 0, 0.06)' } },
+        // 70%-100% 浅红 高估区
+        { type: 'rect', left: '3%', right: '4%', top: '60%', bottom: '8%', style: { fill: 'rgba(245, 63, 63, 0.08)' } }
+    ],
+    // 30%、70% 分割虚线
+    markLine: {
+        silent: true,
+        lineStyle: { color: '#ccc', type: 'dashed' },
+        label: { position: 'end', fontSize: 11, color: '#999' },
+        data: [
+            { yAxis: 30, name: '低估线 30%' },
+            { yAxis: 70, name: '高估线 70%' }
+        ]
     },
     series: [
         {
             name: '估值分位',
             type: 'line',
-            data: yData,
+            data: seriesData,
             smooth: true,
             symbol: 'circle',
-            symbolSize: 8,
-            lineStyle: {width: 2},
-            areaStyle: {opacity: 0.15}
+            symbolSize: 7,
+            lineStyle: { width: 2, color: '#1677ff' },
+            itemStyle: { color: '#1677ff' },
+            areaStyle: { opacity: 0.1, color: '#1677ff' }
         }
-    ],
-    // 参考线：30%低估线、70%高估线（支付宝同款）
-    markLine: {
-        silent: true,
-        data: [
-            {yAxis: 30, name: '低估线'},
-            {yAxis: 70, name: '高估线'}
-        ],
-        lineStyle: {color: '#999', type: 'dashed'}
-    }
+    ]
 };
 
 myChart.setOption(option);
-window.addEventListener('resize', ()=>myChart.resize());
+// 窗口自适应
+window.addEventListener('resize', () => myChart.resize());
 </script>
 </body>
 </html>
