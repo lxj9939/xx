@@ -154,7 +154,7 @@ indexList.forEach(item => {
     listDom.innerHTML += html;
 });
 
-// ========== ECharts 图表：Y轴为PE数值 ==========
+// ========== ECharts 图表：Y轴为PE数值（修复版） ==========
 const chartDom = document.getElementById('valuationChart');
 const myChart = echarts.init(chartDom);
 
@@ -199,30 +199,47 @@ const option = {
         splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
         axisLine: { lineStyle: { color: '#eee' } }
     },
-    // 背景分区：按全局PE区间划分三色底色
+    // 背景分区：改用y轴数值定位，避免旧API报错
     graphic: [
         // 0~30% 浅绿 低估区
         {
             type: 'rect',
-            left: '3%', right: '4%',
-            top: echarts.format.addPercent(100 - 30),
+            left: '3%',
+            right: '4%',
+            y: function (coord) {
+                return coord.convertCoord([0, line30])[1];
+            },
+            top: null,
             bottom: '8%',
+            width: null,
             style: { fill: 'rgba(0, 180, 42, 0.08)' }
         },
         // 30%~70% 浅黄 中性区
         {
             type: 'rect',
-            left: '3%', right: '4%',
-            top: echarts.format.addPercent(100 - 70),
-            bottom: echarts.format.addPercent(30),
+            left: '3%',
+            right: '4%',
+            y: function (coord) {
+                return coord.convertCoord([0, line70])[1];
+            },
+            height: function (coord) {
+                const top = coord.convertCoord([0, line70])[1];
+                const bottom = coord.convertCoord([0, line30])[1];
+                return bottom - top;
+            },
             style: { fill: 'rgba(255, 125, 0, 0.06)' }
         },
         // 70%~100% 浅红 高估区
         {
             type: 'rect',
-            left: '3%', right: '4%',
+            left: '3%',
+            right: '4%',
             top: '8%',
-            bottom: echarts.format.addPercent(70),
+            height: function (coord) {
+                const top = coord.convertCoord([0, line70])[1];
+                const bottom = coord.convertCoord([0, allMaxPE])[1];
+                return bottom - top;
+            },
             style: { fill: 'rgba(245, 63, 63, 0.08)' }
         }
     ],
