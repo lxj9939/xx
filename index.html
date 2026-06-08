@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>指数红绿灯 - 全年PE走势</title>
+    <title>指数红绿灯 - 多图联动</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         * {
@@ -15,6 +15,7 @@
         body {
             background-color: #f5f6f8;
             padding: 12px;
+            overflow-x: auto;
         }
         .header {
             text-align: center;
@@ -31,20 +32,24 @@
             color: #999;
             margin-top: 4px;
         }
-        #valuationChart {
-            width: 100%;
-            height: 440px;
+        .chart-item {
+            width: 200%;
+            height: 320px;
             background: #fff;
-            border-radius: 10px;
-            padding: 8px;
+            padding: 4px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            margin-bottom: 15px;
+            margin: 0;
+            border-radius: 0;
         }
+        .chart-item:first-child { border-radius: 10px 10px 0 0; }
+        .chart-item:last-child  { border-radius: 0 0 10px 10px; }
         .list-wrap {
             background: #fff;
             border-radius: 10px;
             padding: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-top: 16px;
+            width: 200%;
         }
         .list-title {
             font-size: 16px;
@@ -61,32 +66,11 @@
             border-bottom: 1px solid #f2f2f2;
             flex-wrap: wrap;
         }
-        .index-item:last-child {
-            border-bottom: none;
-        }
-        .index-name {
-            flex: 1;
-            font-size: 15px;
-            color: #222;
-        }
-        .index-data {
-            flex: 1.4;
-            text-align: center;
-            font-size: 14px;
-            color: #555;
-        }
-        .status-tag {
-            flex: 0.8;
-            text-align: right;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .tip {
-            width: 100%;
-            font-size: 12px;
-            color: #999;
-            margin-top: 4px;
-        }
+        .index-item:last-child { border-bottom: none; }
+        .index-name { flex: 1; font-size: 15px; color: #222; }
+        .index-data { flex: 1.4; text-align: center; font-size: 14px; color: #555; }
+        .status-tag { flex: 0.8; text-align: right; font-size: 14px; font-weight: bold; }
+        .tip { width: 100%; font-size: 12px; color: #999; margin-top: 4px; }
         .tag-low { color: #00b42a; }
         .tag-mid { color: #ff7d00; }
         .tag-high { color: #f53f3f; }
@@ -95,10 +79,10 @@
 <body>
     <div class="header">
         <h1>指数红绿灯</h1>
-        <p>全年历史PE走势 | 全局统一估值坐标</p>
+        <p>X轴隐藏 | 多图联动 | 点击/悬停同步垂直线</p>
     </div>
 
-    <div id="valuationChart"></div>
+    <div id="chartContainer"></div>
 
     <div class="list-wrap">
         <div class="list-title">指数估值一览</div>
@@ -106,165 +90,146 @@
     </div>
 
 <script>
-// 一、全年12个月日期（X轴，清晰竖排）
-const dateList = [
-    "2025-01","2025-02","2025-03","2025-04",
-    "2025-05","2025-06","2025-07","2025-08",
-    "2025-09","2025-10","2025-11","2025-12"
-];
-
-// 二、一年真实风格PE数据 + 各指数历史极值（贴合市场真实区间）
-const indexData = [
-    {
-        name: "沪深300",
-        peHistory: [10.1, 10.3, 10.8, 11.2, 11.5, 11.3, 10.9, 10.7, 10.5, 10.2, 10.4, 10.6],
-        minPE: 8.2,
-        maxPE: 17.8
-    },
-    {
-        name: "中证500",
-        peHistory: [15.2, 15.8, 16.5, 17.1, 17.9, 18.3, 18.1, 17.7, 17.2, 16.8, 17.0, 17.4],
-        minPE: 12.3,
-        maxPE: 29.6
-    },
-    {
-        name: "创业板指",
-        peHistory: [32.5, 33.8, 34.6, 35.2, 34.8, 33.9, 33.1, 32.7, 33.3, 34.1, 34.7, 35.0],
-        minPE: 20.5,
-        maxPE: 59.2
-    },
-    {
-        name: "中证消费",
-        peHistory: [29.6, 30.5, 31.2, 31.9, 32.5, 32.8, 32.6, 32.1, 31.7, 31.3, 31.8, 32.2],
-        minPE: 22.4,
-        maxPE: 47.5
-    },
-    {
-        name: "中证医药",
-        peHistory: [21.3, 22.1, 22.9, 23.5, 24.1, 24.6, 24.3, 23.8, 23.2, 22.7, 23.1, 23.6],
-        minPE: 16.2,
-        maxPE: 35.8
+// 生成日期
+function generateDayList(startYear = 2025, totalDays = 365) {
+    const dayArr = [];
+    let now = new Date(startYear, 0, 1);
+    for (let i = 0; i < totalDays; i++) {
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        dayArr.push(`${y}-${m}-${d}`);
+        now.setDate(now.getDate() + 1);
     }
+    return dayArr;
+}
+const dateList = generateDayList(2025, 365);
+
+// 生成PE数据
+function genPEData(base, min, max, days = 365) {
+    const res = [];
+    let val = base;
+    for (let i = 0; i < days; i++) {
+        const change = (Math.random() - 0.5) * 0.25;
+        val += change;
+        val = Math.max(min, Math.min(max, val));
+        res.push(parseFloat(val.toFixed(2)));
+    }
+    return res;
+}
+
+// 各指数
+const indexData = [
+    { name: "沪深300", peHistory: genPEData(10.6, 8.2, 17.8, 365) },
+    { name: "中证500", peHistory: genPEData(17.4, 12.3, 29.6, 365) },
+    { name: "创业板指", peHistory: genPEData(35.0, 20.5, 59.2, 365) },
+    { name: "中证消费", peHistory: genPEData(32.2, 22.4, 47.5, 365) },
+    { name: "中证医药", peHistory: genPEData(23.6, 16.2, 35.8, 365) }
 ];
 
-// 三、计算单指数PE区间分位
+// 渲染列表
 function getPercent(nowPE, minPE, maxPE) {
     if (maxPE === minPE) return 50;
     let pct = (nowPE - minPE) / (maxPE - minPE) * 100;
     return Math.max(0, Math.min(100, pct));
 }
-
-// 四、全局Y轴极值（所有指数PE最大/最小，统一坐标系）
-const allMinPE = Math.min(...indexData.map(item => item.minPE));
-const allMaxPE = Math.max(...indexData.map(item => item.maxPE));
-const totalRange = allMaxPE - allMinPE;
-const line30 = allMinPE + totalRange * 0.3;
-const line70 = allMinPE + totalRange * 0.7;
-
-// 五、渲染下方估值列表+红绿灯
 const listDom = document.getElementById('indexList');
 indexData.forEach(item => {
-    const nowPE = item.peHistory[item.peHistory.length - 1];
-    const pct = getPercent(nowPE, item.minPE, item.maxPE);
+    const nowPE = item.peHistory.at(-1);
+    const minPE = Math.min(...item.peHistory);
+    const maxPE = Math.max(...item.peHistory);
+    const pct = getPercent(nowPE, minPE, maxPE);
     let statusText, className, tip;
-
-    if (pct < 30) {
-        statusText = "低估 🟢";
-        className = "tag-low";
-        tip = `当前PE${nowPE}，处于历史低位`;
-    } else if (pct < 70) {
-        statusText = "中性 🟡";
-        className = "tag-mid";
-        tip = `当前PE${nowPE}，估值适中`;
-    } else {
-        statusText = "高估 🔴";
-        className = "tag-high";
-        tip = `当前PE${nowPE}，处于历史高位`;
-    }
-
-    const html = `
+    if (pct < 30) { statusText = "低估 🟢"; className = "tag-low"; tip = `当前PE${nowPE}，低位`; }
+    else if (pct < 70) { statusText = "中性 🟡"; className = "tag-mid"; tip = `当前PE${nowPE}，适中`; }
+    else { statusText = "高估 🔴"; className = "tag-high"; tip = `当前PE${nowPE}，高位`; }
+    listDom.innerHTML += `
         <div class="index-item">
             <div class="index-name">${item.name}</div>
             <div class="index-data">当前PE：${nowPE} | 区间占比：${pct.toFixed(1)}%</div>
             <div class="status-tag ${className}">${statusText}</div>
-            <div class="tip">${tip}（历史区间：${item.minPE} ~ ${item.maxPE}）</div>
+            <div class="tip">${tip}（区间：${minPE} ~ ${maxPE}）</div>
         </div>
     `;
-    listDom.innerHTML += html;
 });
 
-// 六、初始化图表
-const chartDom = document.getElementById('valuationChart');
-const myChart = echarts.init(chartDom);
-
-// 多折线配色
+// 多图联动：统一group + connect
+const chartContainer = document.getElementById('chartContainer');
 const colorList = ['#1677ff', '#00b42a', '#f53f3f', '#ff7d00', '#722ed1'];
-const seriesList = indexData.map((item, idx) => {
-    return {
-        name: item.name,
-        type: 'line',
-        data: item.peHistory,
-        smooth: true,
-        symbol: 'circle',
-        symbolSize: 5,
-        lineStyle: { width: 2, color: colorList[idx] },
-        itemStyle: { color: colorList[idx] }
+const chartInstances = [];
+const groupId = 'pe-group-all';
+
+indexData.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'chart-item';
+    div.id = `chart_${idx}`;
+    chartContainer.appendChild(div);
+
+    const myChart = echarts.init(div);
+    myChart.group = groupId; // 同一分组
+    chartInstances.push(myChart);
+
+    const dataArr = item.peHistory;
+    const currMin = Math.min(...dataArr);
+    const currMax = Math.max(...dataArr);
+    const range = currMax - currMin;
+    const line30 = currMin + range * 0.3;
+    const line70 = currMin + range * 0.7;
+
+    const option = {
+        title: { text: item.name, left: 'center', top: 5, textStyle: { fontSize: 14 } },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'line', lineStyle: { color: '#f53f3f', width: 1.5 } },
+            formatter: '{b}<br/>{a}: {c}'
+        },
+        grid: { left: 0, right: 0, top: '12%', bottom: '5%', containLabel: false },
+        xAxis: {
+            type: 'category',
+            data: dateList,
+            boundaryGap: false,
+            show: false,          // 整体隐藏X轴
+            axisLabel: { show: false },
+            axisTick: { show: false },
+            axisLine: { show: false }
+        },
+        yAxis: {
+            type: 'value',
+            min: currMin,
+            max: currMax,
+            boundaryGap: [0, 0],
+            scale: true,
+            axisLabel: { inside: true, position: 'left', fontSize: 10, color: '#666' },
+            splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
+            axisLine: { show: false }
+        },
+        markLine: {
+            silent: true,
+            lineStyle: { color: '#999', type: 'dashed' },
+            label: { position: 'end', fontSize: 9, color: '#666' },
+            data: [{ yAxis: line30, name: '30%' }, { yAxis: line70, name: '70%' }]
+        },
+        series: [{
+            name: 'PE',
+            type: 'line',
+            data: dataArr,
+            smooth: true,
+            symbol: 'none',
+            lineStyle: { width: 1.8, color: colorList[idx] },
+            itemStyle: { color: colorList[idx] },
+            connectNulls: true
+        }]
     };
+    myChart.setOption(option);
 });
 
-const option = {
-    tooltip: { trigger: 'axis' },
-    legend: { data: indexData.map(d => d.name), top: 0 },
-    // 左右无空白，紧贴边界
-    grid: {
-        left: 0,
-        right: 0,
-        top: '8%',
-        bottom: '12%',
-        containLabel: false
-    },
-    xAxis: {
-        type: 'category',
-        data: dateList,
-        boundaryGap: false, // 左右两端不留空白
-        axisLabel: {
-            rotate: 90,        // 日期竖排
-            fontSize: 12,      // 字号加大，更清晰
-            color: '#333'
-        },
-        axisLine: { lineStyle: { color: '#ccc' } }
-    },
-    yAxis: {
-        type: 'value',
-        name: 'PE',
-        min: allMinPE,
-        max: allMaxPE,
-        boundaryGap: false,
-        // Y轴文字 显示在图表内部左侧
-        axisLabel: {
-            inside: true,
-            position: 'left',
-            fontSize: 11,
-            color: '#666'
-        },
-        splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
-        axisLine: { show: false }
-    },
-    // 30% / 70% 估值分割虚线
-    markLine: {
-        silent: true,
-        lineStyle: { color: '#999', type: 'dashed' },
-        label: { position: 'end', fontSize: 10, color: '#666' },
-        data: [
-            { yAxis: line30, name: '30%' },
-            { yAxis: line70, name: '70%' }
-        ]
-    },
-    series: seriesList
-};
+// 建立全局联动：悬停/点击，所有图同步垂直线+tooltip
+echarts.connect(groupId);
 
-myChart.setOption(option);
-window.addEventListener('resize', () => myChart.resize());
+// 窗口自适应
+window.addEventListener('resize', () => {
+    chartInstances.forEach(chart => chart.resize());
+});
 </script>
 </body>
 </html>
