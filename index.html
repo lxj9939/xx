@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>指数红绿灯 - 复刻支付宝(PE区间版)</title>
+    <title>指数红绿灯 - 多指数PE走势</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         * {
@@ -33,7 +33,7 @@
         }
         #valuationChart {
             width: 100%;
-            height: 380px;
+            height: 420px;
             background: #fff;
             border-radius: 10px;
             padding: 10px;
@@ -95,58 +95,97 @@
 <body>
     <div class="header">
         <h1>指数红绿灯</h1>
-        <p>以历史PE高低区间划分 · 低于30%低估 / 高于70%高估</p>
+        <p>多指数PE历史走势 | 全局统一PE坐标</p>
     </div>
 
     <div id="valuationChart"></div>
 
     <div class="list-wrap">
-        <div class="list-title">主流指数估值一览</div>
+        <div class="list-title">指数估值一览</div>
         <div id="indexList"></div>
     </div>
 
 <script>
-// 数据结构：每个指数 = 名称 + 当前PE + 历史最低PE + 历史最高PE
-const indexList = [
-    { name: "沪深300", nowPE: 11.25, minPE: 8.0, maxPE: 18.0 },
-    { name: "中证500", nowPE: 18.62, minPE: 12.0, maxPE: 30.0 },
-    { name: "创业板指", nowPE: 35.10, minPE: 20.0, maxPE: 60.0 },
-    { name: "中证消费", nowPE: 32.45, minPE: 22.0, maxPE: 48.0 },
-    { name: "中证医药", nowPE: 24.80, minPE: 16.0, maxPE: 36.0 },
-    { name: "中证新能源", nowPE: 42.33, minPE: 25.0, maxPE: 55.0 }
+// 1. 时间轴数据（X轴日期）
+const dateList = [
+    "2025-01", "2025-02", "2025-03", "2025-04",
+    "2025-05", "2025-06", "2025-07", "2025-08"
 ];
 
-// 统一计算：PE所处历史区间百分位
-function getPercent(now, min, max) {
-    if (max === min) return 50;
-    let pct = (now - min) / (max - min) * 100;
+// 2. 各指数历史PE数据 + 单指数历史极值
+const indexData = [
+    {
+        name: "沪深300",
+        peHistory: [9.2, 9.8, 10.5, 10.9, 11.25, 11.0, 10.7, 11.25],
+        minPE: 8.0,
+        maxPE: 18.0
+    },
+    {
+        name: "中证500",
+        peHistory: [14.2, 15.5, 16.1, 17.3, 18.0, 18.62, 18.2, 18.62],
+        minPE: 12.0,
+        maxPE: 30.0
+    },
+    {
+        name: "创业板指",
+        peHistory: [26.5, 28.2, 30.1, 32.6, 33.8, 34.5, 34.9, 35.10],
+        minPE: 20.0,
+        maxPE: 60.0
+    },
+    {
+        name: "中证消费",
+        peHistory: [26.1, 27.8, 29.5, 30.8, 31.6, 32.1, 32.3, 32.45],
+        minPE: 22.0,
+        maxPE: 48.0
+    },
+    {
+        name: "中证医药",
+        peHistory: [18.5, 20.2, 21.6, 22.9, 23.7, 24.2, 24.5, 24.80],
+        minPE: 16.0,
+        maxPE: 36.0
+    }
+];
+
+// 3. 计算单指数PE区间分位
+function getPercent(nowPE, minPE, maxPE) {
+    if (maxPE === minPE) return 50;
+    let pct = (nowPE - minPE) / (maxPE - minPE) * 100;
     return Math.max(0, Math.min(100, pct));
 }
 
-// 渲染列表 + 红绿灯
+// 4. 计算【全局统一Y轴】极值：所有指数历史PE的最小/最大值
+const allMinPE = Math.min(...indexData.map(item => item.minPE));
+const allMaxPE = Math.max(...indexData.map(item => item.maxPE));
+const totalRange = allMaxPE - allMinPE;
+// 全局30%、70%对应PE数值（估值分界线）
+const line30 = allMinPE + totalRange * 0.3;
+const line70 = allMinPE + totalRange * 0.7;
+
+// 5. 渲染下方列表+红绿灯
 const listDom = document.getElementById('indexList');
-indexList.forEach(item => {
-    const pct = getPercent(item.nowPE, item.minPE, item.maxPE);
+indexData.forEach(item => {
+    const nowPE = item.peHistory[item.peHistory.length - 1];
+    const pct = getPercent(nowPE, item.minPE, item.maxPE);
     let statusText, className, tip;
 
     if (pct < 30) {
         statusText = "低估 🟢";
         className = "tag-low";
-        tip = `当前PE${item.nowPE}，处于历史低位`;
+        tip = `当前PE${nowPE}，处于历史低位`;
     } else if (pct < 70) {
         statusText = "中性 🟡";
         className = "tag-mid";
-        tip = `当前PE${item.nowPE}，估值适中`;
+        tip = `当前PE${nowPE}，估值适中`;
     } else {
         statusText = "高估 🔴";
         className = "tag-high";
-        tip = `当前PE${item.nowPE}，处于历史高位`;
+        tip = `当前PE${nowPE}，处于历史高位`;
     }
 
     const html = `
         <div class="index-item">
             <div class="index-name">${item.name}</div>
-            <div class="index-data">当前PE：${item.nowPE} | 区间占比：${pct.toFixed(1)}%</div>
+            <div class="index-data">当前PE：${nowPE} | 区间占比：${pct.toFixed(1)}%</div>
             <div class="status-tag ${className}">${statusText}</div>
             <div class="tip">${tip}（历史区间：${item.minPE} ~ ${item.maxPE}）</div>
         </div>
@@ -154,41 +193,47 @@ indexList.forEach(item => {
     listDom.innerHTML += html;
 });
 
-// ========== ECharts 图表：Y轴为PE数值（修复版） ==========
+// 6. ECharts 图表初始化
 const chartDom = document.getElementById('valuationChart');
 const myChart = echarts.init(chartDom);
 
-const xData = indexList.map(d => d.name);
-const peData = indexList.map(d => d.nowPE);
-
-// 全局历史PE极值（用于画全局30%/70%分割线 + 底色分区）
-const allMinPE = Math.min(...indexList.map(d => d.minPE));
-const allMaxPE = Math.max(...indexList.map(d => d.maxPE));
-const totalRange = allMaxPE - allMinPE;
-// 全局30%、70%对应的PE数值
-const line30 = allMinPE + totalRange * 0.3;
-const line70 = allMinPE + totalRange * 0.7;
+// 组装多系列折线数据（每个指数一条线）
+const seriesList = indexData.map((item, idx) => {
+    const colorArr = ['#1677ff', '#00b42a', '#f53f3f', '#ff7d00', '#722ed1'];
+    return {
+        name: item.name,
+        type: 'line',
+        data: item.peHistory,
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 5,
+        lineStyle: { width: 2, color: colorArr[idx % colorArr.length] },
+        itemStyle: { color: colorArr[idx % colorArr.length] }
+    };
+});
 
 const option = {
     tooltip: {
-        trigger: 'axis',
-        formatter: function(params) {
-            const idx = params[0].dataIndex;
-            const d = indexList[idx];
-            const pct = getPercent(d.nowPE, d.minPE, d.maxPE).toFixed(1);
-            return `${d.name}<br/>当前PE：${d.nowPE}<br/>历史区间占比：${pct}%`;
-        }
+        trigger: 'axis'
+    },
+    legend: {
+        data: indexData.map(item => item.name),
+        top: 0
     },
     grid: {
         left: '3%',
         right: '4%',
-        bottom: '8%',
+        bottom: '12%',
         containLabel: true
     },
     xAxis: {
         type: 'category',
-        data: xData,
-        axisLabel: { rotate: 15 },
+        data: dateList,
+        // X轴日期 竖排显示
+        axisLabel: {
+            rotate: 90,
+            fontSize: 11
+        },
         axisLine: { lineStyle: { color: '#eee' } }
     },
     yAxis: {
@@ -199,51 +244,7 @@ const option = {
         splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
         axisLine: { lineStyle: { color: '#eee' } }
     },
-    // 背景分区：改用y轴数值定位，避免旧API报错
-    graphic: [
-        // 0~30% 浅绿 低估区
-        {
-            type: 'rect',
-            left: '3%',
-            right: '4%',
-            y: function (coord) {
-                return coord.convertCoord([0, line30])[1];
-            },
-            top: null,
-            bottom: '8%',
-            width: null,
-            style: { fill: 'rgba(0, 180, 42, 0.08)' }
-        },
-        // 30%~70% 浅黄 中性区
-        {
-            type: 'rect',
-            left: '3%',
-            right: '4%',
-            y: function (coord) {
-                return coord.convertCoord([0, line70])[1];
-            },
-            height: function (coord) {
-                const top = coord.convertCoord([0, line70])[1];
-                const bottom = coord.convertCoord([0, line30])[1];
-                return bottom - top;
-            },
-            style: { fill: 'rgba(255, 125, 0, 0.06)' }
-        },
-        // 70%~100% 浅红 高估区
-        {
-            type: 'rect',
-            left: '3%',
-            right: '4%',
-            top: '8%',
-            height: function (coord) {
-                const top = coord.convertCoord([0, line70])[1];
-                const bottom = coord.convertCoord([0, allMaxPE])[1];
-                return bottom - top;
-            },
-            style: { fill: 'rgba(245, 63, 63, 0.08)' }
-        }
-    ],
-    // 两条分割虚线：对应全局PE的30%、70%位置
+    // 估值分割线 30% / 70%
     markLine: {
         silent: true,
         lineStyle: { color: '#ccc', type: 'dashed' },
@@ -253,19 +254,7 @@ const option = {
             { yAxis: line70, name: '70% 高估线' }
         ]
     },
-    series: [
-        {
-            name: '当前PE',
-            type: 'line',
-            data: peData,
-            smooth: true,
-            symbol: 'circle',
-            symbolSize: 7,
-            lineStyle: { width: 2, color: '#1677ff' },
-            itemStyle: { color: '#1677ff' },
-            areaStyle: { opacity: 0.1, color: '#1677ff' }
-        }
-    ]
+    series: seriesList
 };
 
 myChart.setOption(option);
