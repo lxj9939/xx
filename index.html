@@ -16,6 +16,20 @@
             background-color: #f5f6f8;
             padding: 12px;
         }
+        .mock-tip {
+            background: #fff3cd;
+            color: #856404;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 8px;
+            display: none;
+        }
+        .load-tip {
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 13px;
+        }
         .chart-item {
             width: 100%;
             height: 600px;
@@ -23,37 +37,78 @@
             border-radius: 10px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
-        .tip {
-            margin-bottom: 8px;
-            color: #666;
-            font-size: 13px;
-        }
     </style>
 </head>
 <body>
-    <div class="tip">加载中，正在获取行情数据...</div>
+    <!-- 模拟数据顶部提示 -->
+    <div class="mock-tip" id="mockTip">⚠️ 当前展示为模拟数据，公共行情接口暂时无法访问</div>
+    <div class="load-tip" id="loadTip">加载中，正在获取行情数据...</div>
     <div id="chartContainer" class="chart-item"></div>
 
 <script>
 const chartDom = document.getElementById('chartContainer');
-const tipDom = document.querySelector('.tip');
+const loadTip = document.getElementById('loadTip');
+const mockTip = document.getElementById('mockTip');
 let myChart = echarts.init(chartDom);
 const lineColor = ['#00b42a','#73c000','#ffd700','#ff7d00','#f53f3f'];
 
-// 指数列表
+// ========== 全行业+宽基指数板块（完整扩充） ==========
 const indexList = [
+    // 宽基指数
     { name: "沪深300", code: "1.000300" },
     { name: "中证500", code: "1.000905" },
+    { name: "中证1000", code: "1.000852" },
     { name: "创业板指", code: "0.399006" },
+    { name: "科创50", code: "1.000688" },
+    { name: "上证50", code: "1.000016" },
+    { name: "中证全指", code: "1.000985" },
+
+    // 大消费
     { name: "中证消费", code: "1.000932" },
+    { name: "白酒", code: "1.931817" },
+    { name: "食品饮料", code: "1.931396" },
+    { name: "家电", code: "1.931388" },
+    { name: "纺织服装", code: "1.931402" },
+    { name: "农林牧渔", code: "1.931167" },
+
+    // 医药医疗
     { name: "中证医药", code: "1.000933" },
+    { name: "创新药", code: "1.931774" },
+    { name: "医疗器械", code: "1.931789" },
+    { name: "生物疫苗", code: "1.931827" },
+
+    // 科技成长
     { name: "半导体", code: "1.931786" },
-    { name: "新能源", code: "1.931151" },
+    { name: "新能源车", code: "1.931151" },
+    { name: "光伏", code: "1.931811" },
+    { name: "锂电池", code: "1.931846" },
+    { name: "计算机", code: "1.931366" },
+    { name: "通信", code: "1.931373" },
+    { name: "电子", code: "1.931376" },
+    { name: "软件服务", code: "1.931369" },
+
+    // 金融板块
     { name: "银行", code: "1.931787" },
     { name: "券商", code: "1.931785" },
-    { name: "白酒", code: "1.931817" },
+    { name: "保险", code: "1.931790" },
+    { name: "多元金融", code: "1.931793" },
+
+    // 周期板块
+    { name: "地产", code: "1.931775" },
+    { name: "基建", code: "1.931274" },
+    { name: "钢铁", code: "1.931281" },
+    { name: "煤炭", code: "1.931284" },
+    { name: "有色", code: "1.931290" },
+    { name: "化工", code: "1.931293" },
+    { name: "建材", code: "1.931296" },
+
+    // 军工/交运/其他
     { name: "军工", code: "1.931066" },
-    { name: "地产", code: "1.931775" }
+    { name: "航空航天", code: "1.931345" },
+    { name: "交通运输", code: "1.931311" },
+    { name: "港口水运", code: "1.931323" },
+    { name: "旅游酒店", code: "1.931414" },
+    { name: "文化传媒", code: "1.931420" }
 ];
 
 // 估值五档分级
@@ -67,7 +122,7 @@ function getLevel(val, min, max) {
     return 4;
 }
 
-// 带超时的JSONP请求
+// 带超时JSONP
 function jsonpWithTimeout(url, timeout = 5000) {
     return new Promise((resolve, reject) => {
         const cbName = 'jsonpCb_' + Date.now();
@@ -98,7 +153,7 @@ function jsonpWithTimeout(url, timeout = 5000) {
     });
 }
 
-// 东方财富接口获取单指数数据
+// 东方财富接口获取单指数K线
 async function getEastMoneyData(code) {
     const url = `https://push2.eastmoney.com/api/qt/stock/kline/get?secid=${code}&fields1=f1&fields2=f51,f53&klt=101&fqt=0&beg=0&end=0`;
     const res = await jsonpWithTimeout(url);
@@ -106,9 +161,10 @@ async function getEastMoneyData(code) {
     return res.data.klines.slice(-365);
 }
 
-// 生成兜底模拟数据（接口失效时使用）
+// 生成模拟数据 + 开启顶部模拟提示
 function generateMockData(days = 365) {
-    tipDom.innerText = "公共接口请求失败，已加载模拟行情数据";
+    mockTip.style.display = 'block';
+    loadTip.innerText = "已加载模拟行情数据";
     const dateList = [];
     const now = new Date();
     const level0 = [], level1 = [], level2 = [], level3 = [], level4 = [];
@@ -117,21 +173,19 @@ function generateMockData(days = 365) {
         const d = new Date(now.getTime() - i * 24 * 3600 * 1000);
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         dateList.push(dateStr);
-        // 随机模拟各档位数量
-        level0.push(Math.floor(Math.random() * 4) + 1);
-        level1.push(Math.floor(Math.random() * 4) + 2);
-        level2.push(Math.floor(Math.random() * 4) + 3);
-        level3.push(Math.floor(Math.random() * 4) + 2);
-        level4.push(Math.floor(Math.random() * 4) + 1);
+        level0.push(Math.floor(Math.random() * 8) + 2);
+        level1.push(Math.floor(Math.random() * 8) + 4);
+        level2.push(Math.floor(Math.random() * 8) + 6);
+        level3.push(Math.floor(Math.random() * 8) + 4);
+        level4.push(Math.floor(Math.random() * 8) + 2);
     }
     return { dateList, level0, level1, level2, level3, level4 };
 }
 
-// 主入口：优先真实接口，失败走兜底
+// 主逻辑
 async function main() {
     try {
         let allRecord = [];
-        // 逐个拉取指数，单个失败不中断整体
         for (const item of indexList) {
             try {
                 const klineList = await getEastMoneyData(item.code);
@@ -152,20 +206,19 @@ async function main() {
                     allRecord.push({ date, level });
                 });
             } catch (e) {
-                console.log(`${item.name} 数据获取失败`, e);
+                console.log(`${item.name} 获取失败`, e);
                 continue;
             }
         }
 
-        // 无任何有效真实数据，启用兜底
+        // 无有效真实数据，切模拟
         if (allRecord.length === 0) {
             const mock = generateMockData(365);
             renderChart(mock.dateList, mock.level0, mock.level1, mock.level2, mock.level3, mock.level4);
             return;
         }
 
-        tipDom.innerText = "真实行情数据加载完成";
-        // 按日期聚合统计
+        loadTip.innerText = "真实行情数据加载完成";
         const dateSet = [...new Set(allRecord.map(d => d.date))].sort();
         const level0 = [], level1 = [], level2 = [], level3 = [], level4 = [];
         dateSet.forEach(date => {
@@ -178,13 +231,13 @@ async function main() {
         });
         renderChart(dateSet, level0, level1, level2, level3, level4);
     } catch (err) {
-        console.error('整体请求异常', err);
+        console.error('整体异常', err);
         const mock = generateMockData(365);
         renderChart(mock.dateList, mock.level0, mock.level1, mock.level2, mock.level3, mock.level4);
     }
 }
 
-// 渲染图表（完全保留原有样式）
+// 渲染图表（保留原有全部样式）
 function renderChart(dateList, l0, l1, l2, l3, l4) {
     const last0 = l0.at(-1) || 0;
     const last1 = l1.at(-1) || 0;
