@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>指数红绿灯 - 复刻支付宝</title>
-    <!-- ECharts CDN -->
+    <title>指数红绿灯 - 复刻支付宝(PE区间版)</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         * {
@@ -32,7 +31,6 @@
             color: #999;
             margin-top: 4px;
         }
-        /* 图表容器 */
         #valuationChart {
             width: 100%;
             height: 380px;
@@ -42,7 +40,6 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             margin-bottom: 15px;
         }
-        /* 指数列表卡片 */
         .list-wrap {
             background: #fff;
             border-radius: 10px;
@@ -62,6 +59,7 @@
             justify-content: space-between;
             padding: 12px 0;
             border-bottom: 1px solid #f2f2f2;
+            flex-wrap: wrap;
         }
         .index-item:last-child {
             border-bottom: none;
@@ -72,7 +70,7 @@
             color: #222;
         }
         .index-data {
-            flex: 1.2;
+            flex: 1.4;
             text-align: center;
             font-size: 14px;
             color: #555;
@@ -83,82 +81,103 @@
             font-size: 14px;
             font-weight: bold;
         }
-        /* 红绿灯样式 */
+        .tip {
+            width: 100%;
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
         .tag-low { color: #00b42a; }
         .tag-mid { color: #ff7d00; }
         .tag-high { color: #f53f3f; }
-        .tip {
-            font-size: 12px;
-            color: #999;
-            margin-top: 3px;
-        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>指数红绿灯</h1>
-        <p>基于PE/PB估值分位 · 参考近5年历史估值</p>
+        <p>以历史PE高低区间划分 · 低于30%低估 / 高于70%高估</p>
     </div>
 
-    <!-- 估值折线图（带分区背景） -->
     <div id="valuationChart"></div>
 
-    <!-- 指数列表 + 红绿灯 -->
     <div class="list-wrap">
         <div class="list-title">主流指数估值一览</div>
         <div id="indexList"></div>
     </div>
 
 <script>
-// 1. 模拟真实指数数据（区分PE/PB，对标支付宝主流指数）
+// 数据结构：每个指数 = 名称 + 当前PE + 历史最低PE + 历史最高PE
 const indexList = [
-    { name: "沪深300", type: "PE", value: 11.25, percent: 22, tip: "低估，适合定投" },
-    { name: "中证500", type: "PE", value: 18.62, percent: 28, tip: "低估，可分批布局" },
-    { name: "创业板指", type: "PE", value: 35.10, percent: 76, tip: "高估，谨慎入场" },
-    { name: "中证消费", type: "PE", value: 32.45, percent: 65, tip: "中性，持有观望" },
-    { name: "中证医药", type: "PE", value: 24.80, percent: 41, tip: "中性，逢低加仓" },
-    { name: "中证新能源", type: "PE", value: 42.33, percent: 82, tip: "高估，不追高" },
-    { name: "中证银行", type: "PB", value: 0.78, percent: 19, tip: "低估，防御配置" }
+    { name: "沪深300", nowPE: 11.25, minPE: 8.0, maxPE: 18.0 },
+    { name: "中证500", nowPE: 18.62, minPE: 12.0, maxPE: 30.0 },
+    { name: "创业板指", nowPE: 35.10, minPE: 20.0, maxPE: 60.0 },
+    { name: "中证消费", nowPE: 32.45, minPE: 22.0, maxPE: 48.0 },
+    { name: "中证医药", nowPE: 24.80, minPE: 16.0, maxPE: 36.0 },
+    { name: "中证新能源", nowPE: 42.33, minPE: 25.0, maxPE: 55.0 }
 ];
 
-// 2. 渲染指数列表 + 红绿灯标签
+// 统一计算：PE所处历史区间百分位
+function getPercent(now, min, max) {
+    if (max === min) return 50;
+    let pct = (now - min) / (max - min) * 100;
+    return Math.max(0, Math.min(100, pct));
+}
+
+// 渲染列表 + 红绿灯
 const listDom = document.getElementById('indexList');
 indexList.forEach(item => {
-    let statusText, className;
-    if (item.percent < 30) {
+    const pct = getPercent(item.nowPE, item.minPE, item.maxPE);
+    let statusText, className, tip;
+
+    if (pct < 30) {
         statusText = "低估 🟢";
         className = "tag-low";
-    } else if (item.percent < 70) {
+        tip = `当前PE${item.nowPE}，处于历史低位`;
+    } else if (pct < 70) {
         statusText = "中性 🟡";
         className = "tag-mid";
+        tip = `当前PE${item.nowPE}，估值适中`;
     } else {
         statusText = "高估 🔴";
         className = "tag-high";
+        tip = `当前PE${item.nowPE}，处于历史高位`;
     }
 
-    const itemHtml = `
+    const html = `
         <div class="index-item">
             <div class="index-name">${item.name}</div>
-            <div class="index-data">${item.type}：${item.value} | 分位：${item.percent}%</div>
+            <div class="index-data">当前PE：${item.nowPE} | 区间占比：${pct.toFixed(1)}%</div>
             <div class="status-tag ${className}">${statusText}</div>
-            <div class="tip">${item.tip}</div>
+            <div class="tip">${tip}（历史区间：${item.minPE} ~ ${item.maxPE}）</div>
         </div>
     `;
-    listDom.innerHTML += itemHtml;
+    listDom.innerHTML += html;
 });
 
-// 3. 初始化ECharts图表（复刻支付宝分区折线图）
+// ========== ECharts 图表：Y轴为PE数值 ==========
 const chartDom = document.getElementById('valuationChart');
 const myChart = echarts.init(chartDom);
 
-// 图表数据
-const xAxisData = indexList.map(item => item.name);
-const seriesData = indexList.map(item => item.percent);
+const xData = indexList.map(d => d.name);
+const peData = indexList.map(d => d.nowPE);
+
+// 全局历史PE极值（用于画全局30%/70%分割线 + 底色分区）
+const allMinPE = Math.min(...indexList.map(d => d.minPE));
+const allMaxPE = Math.max(...indexList.map(d => d.maxPE));
+const totalRange = allMaxPE - allMinPE;
+// 全局30%、70%对应的PE数值
+const line30 = allMinPE + totalRange * 0.3;
+const line70 = allMinPE + totalRange * 0.7;
 
 const option = {
     tooltip: {
         trigger: 'axis',
-        formatter: '{b}<br/>估值分位：{c}%'
+        formatter: function(params) {
+            const idx = params[0].dataIndex;
+            const d = indexList[idx];
+            const pct = getPercent(d.nowPE, d.minPE, d.maxPE).toFixed(1);
+            return `${d.name}<br/>当前PE：${d.nowPE}<br/>历史区间占比：${pct}%`;
+        }
     },
     grid: {
         left: '3%',
@@ -168,42 +187,60 @@ const option = {
     },
     xAxis: {
         type: 'category',
-        data: xAxisData,
+        data: xData,
         axisLabel: { rotate: 15 },
         axisLine: { lineStyle: { color: '#eee' } }
     },
     yAxis: {
         type: 'value',
-        name: '估值分位(%)',
-        max: 100,
-        min: 0,
+        name: 'PE 数值',
+        min: allMinPE,
+        max: allMaxPE,
         splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
         axisLine: { lineStyle: { color: '#eee' } }
     },
-    // 分区背景色（支付宝三段底色）
+    // 背景分区：按全局PE区间划分三色底色
     graphic: [
-        // 0-30% 浅绿 低估区
-        { type: 'rect', left: '3%', right: '4%', top: '8%', bottom: '28%', style: { fill: 'rgba(0, 180, 42, 0.08)' } },
-        // 30%-70% 浅灰 中性区
-        { type: 'rect', left: '3%', right: '4%', top: '28%', bottom: '60%', style: { fill: 'rgba(255, 125, 0, 0.06)' } },
-        // 70%-100% 浅红 高估区
-        { type: 'rect', left: '3%', right: '4%', top: '60%', bottom: '8%', style: { fill: 'rgba(245, 63, 63, 0.08)' } }
+        // 0~30% 浅绿 低估区
+        {
+            type: 'rect',
+            left: '3%', right: '4%',
+            top: echarts.format.addPercent(100 - 30),
+            bottom: '8%',
+            style: { fill: 'rgba(0, 180, 42, 0.08)' }
+        },
+        // 30%~70% 浅黄 中性区
+        {
+            type: 'rect',
+            left: '3%', right: '4%',
+            top: echarts.format.addPercent(100 - 70),
+            bottom: echarts.format.addPercent(30),
+            style: { fill: 'rgba(255, 125, 0, 0.06)' }
+        },
+        // 70%~100% 浅红 高估区
+        {
+            type: 'rect',
+            left: '3%', right: '4%',
+            top: '8%',
+            bottom: echarts.format.addPercent(70),
+            style: { fill: 'rgba(245, 63, 63, 0.08)' }
+        }
     ],
-    // 30%、70% 分割虚线
+    // 两条分割虚线：对应全局PE的30%、70%位置
     markLine: {
         silent: true,
         lineStyle: { color: '#ccc', type: 'dashed' },
         label: { position: 'end', fontSize: 11, color: '#999' },
         data: [
-            { yAxis: 30, name: '低估线 30%' },
-            { yAxis: 70, name: '高估线 70%' }
+            { yAxis: line30, name: '30% 低估线' },
+            { yAxis: line70, name: '70% 高估线' }
         ]
     },
     series: [
         {
-            name: '估值分位',
+            name: '当前PE',
             type: 'line',
-            data: seriesData,
+            data: peData,
             smooth: true,
             symbol: 'circle',
             symbolSize: 7,
@@ -215,7 +252,6 @@ const option = {
 };
 
 myChart.setOption(option);
-// 窗口自适应
 window.addEventListener('resize', () => myChart.resize());
 </script>
 </body>
