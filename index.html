@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>指数红绿灯 - 多指数PE走势</title>
+    <title>指数红绿灯 - 全年PE走势</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         * {
@@ -33,10 +33,10 @@
         }
         #valuationChart {
             width: 100%;
-            height: 420px;
+            height: 440px;
             background: #fff;
             border-radius: 10px;
-            padding: 10px;
+            padding: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             margin-bottom: 15px;
         }
@@ -95,7 +95,7 @@
 <body>
     <div class="header">
         <h1>指数红绿灯</h1>
-        <p>多指数PE历史走势 | 全局统一PE坐标</p>
+        <p>全年历史PE走势 | 全局统一估值坐标</p>
     </div>
 
     <div id="valuationChart"></div>
@@ -106,62 +106,62 @@
     </div>
 
 <script>
-// 1. 时间轴数据（X轴日期）
+// 一、全年12个月日期（X轴，清晰竖排）
 const dateList = [
-    "2025-01", "2025-02", "2025-03", "2025-04",
-    "2025-05", "2025-06", "2025-07", "2025-08"
+    "2025-01","2025-02","2025-03","2025-04",
+    "2025-05","2025-06","2025-07","2025-08",
+    "2025-09","2025-10","2025-11","2025-12"
 ];
 
-// 2. 各指数历史PE数据 + 单指数历史极值
+// 二、一年真实风格PE数据 + 各指数历史极值（贴合市场真实区间）
 const indexData = [
     {
         name: "沪深300",
-        peHistory: [9.2, 9.8, 10.5, 10.9, 11.25, 11.0, 10.7, 11.25],
-        minPE: 8.0,
-        maxPE: 18.0
+        peHistory: [10.1, 10.3, 10.8, 11.2, 11.5, 11.3, 10.9, 10.7, 10.5, 10.2, 10.4, 10.6],
+        minPE: 8.2,
+        maxPE: 17.8
     },
     {
         name: "中证500",
-        peHistory: [14.2, 15.5, 16.1, 17.3, 18.0, 18.62, 18.2, 18.62],
-        minPE: 12.0,
-        maxPE: 30.0
+        peHistory: [15.2, 15.8, 16.5, 17.1, 17.9, 18.3, 18.1, 17.7, 17.2, 16.8, 17.0, 17.4],
+        minPE: 12.3,
+        maxPE: 29.6
     },
     {
         name: "创业板指",
-        peHistory: [26.5, 28.2, 30.1, 32.6, 33.8, 34.5, 34.9, 35.10],
-        minPE: 20.0,
-        maxPE: 60.0
+        peHistory: [32.5, 33.8, 34.6, 35.2, 34.8, 33.9, 33.1, 32.7, 33.3, 34.1, 34.7, 35.0],
+        minPE: 20.5,
+        maxPE: 59.2
     },
     {
         name: "中证消费",
-        peHistory: [26.1, 27.8, 29.5, 30.8, 31.6, 32.1, 32.3, 32.45],
-        minPE: 22.0,
-        maxPE: 48.0
+        peHistory: [29.6, 30.5, 31.2, 31.9, 32.5, 32.8, 32.6, 32.1, 31.7, 31.3, 31.8, 32.2],
+        minPE: 22.4,
+        maxPE: 47.5
     },
     {
         name: "中证医药",
-        peHistory: [18.5, 20.2, 21.6, 22.9, 23.7, 24.2, 24.5, 24.80],
-        minPE: 16.0,
-        maxPE: 36.0
+        peHistory: [21.3, 22.1, 22.9, 23.5, 24.1, 24.6, 24.3, 23.8, 23.2, 22.7, 23.1, 23.6],
+        minPE: 16.2,
+        maxPE: 35.8
     }
 ];
 
-// 3. 计算单指数PE区间分位
+// 三、计算单指数PE区间分位
 function getPercent(nowPE, minPE, maxPE) {
     if (maxPE === minPE) return 50;
     let pct = (nowPE - minPE) / (maxPE - minPE) * 100;
     return Math.max(0, Math.min(100, pct));
 }
 
-// 4. 计算【全局统一Y轴】极值：所有指数历史PE的最小/最大值
+// 四、全局Y轴极值（所有指数PE最大/最小，统一坐标系）
 const allMinPE = Math.min(...indexData.map(item => item.minPE));
 const allMaxPE = Math.max(...indexData.map(item => item.maxPE));
 const totalRange = allMaxPE - allMinPE;
-// 全局30%、70%对应PE数值（估值分界线）
 const line30 = allMinPE + totalRange * 0.3;
 const line70 = allMinPE + totalRange * 0.7;
 
-// 5. 渲染下方列表+红绿灯
+// 五、渲染下方估值列表+红绿灯
 const listDom = document.getElementById('indexList');
 indexData.forEach(item => {
     const nowPE = item.peHistory[item.peHistory.length - 1];
@@ -193,13 +193,13 @@ indexData.forEach(item => {
     listDom.innerHTML += html;
 });
 
-// 6. ECharts 图表初始化
+// 六、初始化图表
 const chartDom = document.getElementById('valuationChart');
 const myChart = echarts.init(chartDom);
 
-// 组装多系列折线数据（每个指数一条线）
+// 多折线配色
+const colorList = ['#1677ff', '#00b42a', '#f53f3f', '#ff7d00', '#722ed1'];
 const seriesList = indexData.map((item, idx) => {
-    const colorArr = ['#1677ff', '#00b42a', '#f53f3f', '#ff7d00', '#722ed1'];
     return {
         name: item.name,
         type: 'line',
@@ -207,51 +207,57 @@ const seriesList = indexData.map((item, idx) => {
         smooth: true,
         symbol: 'circle',
         symbolSize: 5,
-        lineStyle: { width: 2, color: colorArr[idx % colorArr.length] },
-        itemStyle: { color: colorArr[idx % colorArr.length] }
+        lineStyle: { width: 2, color: colorList[idx] },
+        itemStyle: { color: colorList[idx] }
     };
 });
 
 const option = {
-    tooltip: {
-        trigger: 'axis'
-    },
-    legend: {
-        data: indexData.map(item => item.name),
-        top: 0
-    },
+    tooltip: { trigger: 'axis' },
+    legend: { data: indexData.map(d => d.name), top: 0 },
+    // 左右无空白，紧贴边界
     grid: {
-        left: '3%',
-        right: '4%',
+        left: 0,
+        right: 0,
+        top: '8%',
         bottom: '12%',
-        containLabel: true
+        containLabel: false
     },
     xAxis: {
         type: 'category',
         data: dateList,
-        // X轴日期 竖排显示
+        boundaryGap: false, // 左右两端不留空白
         axisLabel: {
-            rotate: 90,
-            fontSize: 11
+            rotate: 90,        // 日期竖排
+            fontSize: 12,      // 字号加大，更清晰
+            color: '#333'
         },
-        axisLine: { lineStyle: { color: '#eee' } }
+        axisLine: { lineStyle: { color: '#ccc' } }
     },
     yAxis: {
         type: 'value',
-        name: 'PE 数值',
+        name: 'PE',
         min: allMinPE,
         max: allMaxPE,
+        boundaryGap: false,
+        // Y轴文字 显示在图表内部左侧
+        axisLabel: {
+            inside: true,
+            position: 'left',
+            fontSize: 11,
+            color: '#666'
+        },
         splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
-        axisLine: { lineStyle: { color: '#eee' } }
+        axisLine: { show: false }
     },
-    // 估值分割线 30% / 70%
+    // 30% / 70% 估值分割虚线
     markLine: {
         silent: true,
-        lineStyle: { color: '#ccc', type: 'dashed' },
-        label: { position: 'end', fontSize: 11, color: '#999' },
+        lineStyle: { color: '#999', type: 'dashed' },
+        label: { position: 'end', fontSize: 10, color: '#666' },
         data: [
-            { yAxis: line30, name: '30% 低估线' },
-            { yAxis: line70, name: '70% 高估线' }
+            { yAxis: line30, name: '30%' },
+            { yAxis: line70, name: '70%' }
         ]
     },
     series: seriesList
