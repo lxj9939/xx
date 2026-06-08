@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>指数红绿灯 - 纯前端真实行情</title>
+    <title>指数红绿灯 - 行情图表</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         * {
@@ -31,7 +31,7 @@
     </style>
 </head>
 <body>
-    <div class="tip">加载中，正在获取真实行情数据...</div>
+    <div class="tip">加载中，正在获取行情数据...</div>
     <div id="chartContainer" class="chart-item"></div>
 
 <script>
@@ -40,7 +40,7 @@ const tipDom = document.querySelector('.tip');
 let myChart = echarts.init(chartDom);
 const lineColor = ['#00b42a','#73c000','#ffd700','#ff7d00','#f53f3f'];
 
-// 配置需要获取的指数（东方财富代码）
+// 指数列表
 const indexList = [
     { name: "沪深300", code: "1.000300" },
     { name: "中证500", code: "1.000905" },
@@ -67,69 +67,107 @@ function getLevel(val, min, max) {
     return 4;
 }
 
-// JSONP 请求函数（解决跨域）
-function jsonp(url, callbackName = 'jsonpCallback') {
+// 带超时的JSONP请求
+function jsonpWithTimeout(url, timeout = 5000) {
     return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        window[callbackName] = (res) => {
-            delete window[callbackName];
-            document.body.removeChild(script);
+        const cbName = 'jsonpCb_' + Date.now();
+        let timer = setTimeout(() => {
+            cleanup();
+            reject('请求超时');
+        }, timeout);
+
+        window[cbName] = (res) => {
+            cleanup();
             resolve(res);
         };
+
+        function cleanup() {
+            clearTimeout(timer);
+            delete window[cbName];
+            const script = document.querySelector(`script[src*="${cbName}"]`);
+            if (script) document.body.removeChild(script);
+        }
+
+        const script = document.createElement('script');
+        script.src = `${url}&callback=${cbName}`;
         script.onerror = () => {
-            delete window[callbackName];
-            document.body.removeChild(script);
-            reject('接口请求失败');
+            cleanup();
+            reject('接口异常');
         };
-        script.src = `${url}&callback=${callbackName}`;
         document.body.appendChild(script);
     });
 }
 
-// 单指数获取近一年数据
-async function getIndexData(code) {
+// 东方财富接口获取单指数数据
+async function getEastMoneyData(code) {
     const url = `https://push2.eastmoney.com/api/qt/stock/kline/get?secid=${code}&fields1=f1&fields2=f51,f53&klt=101&fqt=0&beg=0&end=0`;
-    const res = await jsonp(url);
+    const res = await jsonpWithTimeout(url);
     if (!res?.data?.klines) return [];
-    // 截取近365条日线数据
     return res.data.klines.slice(-365);
 }
 
-// 主逻辑：批量拉取数据 + 统计 + 渲染
+// 生成兜底模拟数据（接口失效时使用）
+function generateMockData(days = 365) {
+    tipDom.innerText = "公共接口请求失败，已加载模拟行情数据";
+    const dateList = [];
+    const now = new Date();
+    const level0 = [], level1 = [], level2 = [], level3 = [], level4 = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 3600 * 1000);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        dateList.push(dateStr);
+        // 随机模拟各档位数量
+        level0.push(Math.floor(Math.random() * 4) + 1);
+        level1.push(Math.floor(Math.random() * 4) + 2);
+        level2.push(Math.floor(Math.random() * 4) + 3);
+        level3.push(Math.floor(Math.random() * 4) + 2);
+        level4.push(Math.floor(Math.random() * 4) + 1);
+    }
+    return { dateList, level0, level1, level2, level3, level4 };
+}
+
+// 主入口：优先真实接口，失败走兜底
 async function main() {
     try {
         let allRecord = [];
-        // 循环拉取所有指数数据
+        // 逐个拉取指数，单个失败不中断整体
         for (const item of indexList) {
-            const klineList = await getIndexData(item.code);
-            if (klineList.length === 0) continue;
+            try {
+                const klineList = await getEastMoneyData(item.code);
+                if (klineList.length === 0) continue;
 
-            const dateArr = [];
-            const valArr = [];
-            klineList.forEach(k => {
-                const [date, close] = k.split(',');
-                dateArr.push(date);
-                valArr.push(parseFloat(close));
-            });
+                const dateArr = [];
+                const valArr = [];
+                klineList.forEach(k => {
+                    const [date, close] = k.split(',');
+                    dateArr.push(date);
+                    valArr.push(parseFloat(close));
+                });
 
-            const minVal = Math.min(...valArr);
-            const maxVal = Math.max(...valArr);
-            // 按日期+分级存入
-            dateArr.forEach((date, idx) => {
-                const level = getLevel(valArr[idx], minVal, maxVal);
-                allRecord.push({ date, level });
-            });
+                const minVal = Math.min(...valArr);
+                const maxVal = Math.max(...valArr);
+                dateArr.forEach((date, idx) => {
+                    const level = getLevel(valArr[idx], minVal, maxVal);
+                    allRecord.push({ date, level });
+                });
+            } catch (e) {
+                console.log(`${item.name} 数据获取失败`, e);
+                continue;
+            }
         }
 
+        // 无任何有效真实数据，启用兜底
         if (allRecord.length === 0) {
-            tipDom.innerText = "数据获取失败，请稍后重试";
+            const mock = generateMockData(365);
+            renderChart(mock.dateList, mock.level0, mock.level1, mock.level2, mock.level3, mock.level4);
             return;
         }
 
-        // 按日期聚合统计各档位数量
+        tipDom.innerText = "真实行情数据加载完成";
+        // 按日期聚合统计
         const dateSet = [...new Set(allRecord.map(d => d.date))].sort();
         const level0 = [], level1 = [], level2 = [], level3 = [], level4 = [];
-
         dateSet.forEach(date => {
             const dayData = allRecord.filter(d => d.date === date);
             level0.push(dayData.filter(d => d.level === 0).length);
@@ -138,17 +176,15 @@ async function main() {
             level3.push(dayData.filter(d => d.level === 3).length);
             level4.push(dayData.filter(d => d.level === 4).length);
         });
-
-        tipDom.innerText = "数据加载完成";
-        // 渲染图表
         renderChart(dateSet, level0, level1, level2, level3, level4);
     } catch (err) {
-        tipDom.innerText = `加载异常：${err}`;
-        console.error(err);
+        console.error('整体请求异常', err);
+        const mock = generateMockData(365);
+        renderChart(mock.dateList, mock.level0, mock.level1, mock.level2, mock.level3, mock.level4);
     }
 }
 
-// 渲染图表（完全沿用你之前的样式配置）
+// 渲染图表（完全保留原有样式）
 function renderChart(dateList, l0, l1, l2, l3, l4) {
     const last0 = l0.at(-1) || 0;
     const last1 = l1.at(-1) || 0;
@@ -179,7 +215,7 @@ function renderChart(dateList, l0, l1, l2, l3, l4) {
 
     const option = {
         title: {
-            text: '全行业五档估值数量统计（真实行情）',
+            text: '全行业五档估值数量统计',
             left: 'left',
             top: 0,
             textStyle: { fontSize: 14, fontWeight: 'bold' }
@@ -244,7 +280,7 @@ function renderChart(dateList, l0, l1, l2, l3, l4) {
 // 窗口自适应
 window.addEventListener('resize', () => myChart.resize());
 
-// 启动程序
+// 启动
 main();
 </script>
 </body>
